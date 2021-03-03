@@ -69,7 +69,6 @@ pipeline {
                               docker build --no-cache -t "devsecops/app:staging" -f docker/app/Dockerfile .
                               docker tag "devsecops/app:staging" "${DOCKER_REGISTRY}/devsecops/app:staging"
                               docker push "${DOCKER_REGISTRY}/devsecops/app:staging"
-                              docker rmi "${DOCKER_REGISTRY}/devsecops/app:staging"
                               
                            '''
                         },

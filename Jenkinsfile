@@ -47,18 +47,6 @@ pipeline {
                      '''
          }
       }
-      stage('Static Analysis') {
-         steps {
-          parallel (
-            SCA: {
-               echo  'Dependency Check'
-            },
-            SAST: {
-                  echo  'FindSecBugs'
-            }
-          )
-        }
-      }
       stage('Staging Setup') {
          steps {
             parallel(
@@ -69,6 +57,7 @@ pipeline {
                               docker build --no-cache -t "devsecops/app:staging" -f docker/app/Dockerfile .
                               docker tag "devsecops/app:staging" "${DOCKER_REGISTRY}/devsecops/app:staging"
                               docker push "${DOCKER_REGISTRY}/devsecops/app:staging"
+                              docker rmi "${DOCKER_REGISTRY}/devsecops/app:staging"
                               
                            '''
                         },
@@ -127,12 +116,11 @@ pipeline {
                      '''
                   },
                   DAST: {
-                     withCredentials([usernamePassword(credentialsId: 'archerysec', passwordVariable: 'ARCHERY_PASS', usernameVariable: 'ARCHERY_USER')]) {
-                     sh '''
-                        bash ${WORKSPACE}/scripts/zapscanner/zapscanner_cli.sh
-                     '''
-                     }
+                     echo 'Dynamic Application Security Testing'
                   },
+                  VA: {
+                     echo 'Vulnerability Assessment'
+                  }
                )
          }
       }
@@ -172,6 +160,21 @@ pipeline {
                         }
                      )
                }
+      }
+      stage('Container Analysis') {
+         steps{
+               parallel(
+                  CS: {
+                     withCredentials([usernamePassword(credentialsId: 'archerysec', passwordVariable: 'ARCHERY_PASS', usernameVariable: 'ARCHERY_USER')]) {
+                     sh '''
+                           export TRIVY_NON_SSL=true
+                           trivy -f json -o ${WORKSPACE}/reports/trivy_report.json ${DOCKER_REGISTRY}/devsecops/app:production
+                           bash ${WORKSPACE}/scripts/trivy/trivy.sh
+                        '''
+                     }
+                  }
+               )
+         }
       }
       stage ('Production Deploy Approval') {
          steps {
